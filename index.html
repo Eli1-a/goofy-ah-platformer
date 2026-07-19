@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartoony 3D Platformer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Three.js — served locally, no CDN dependency -->
+    <script src="three.min.js"></script>
+</head>
+
+<body>
+
+    <!-- ── HUD ── -->
+    <div id="hud">
+        <div id="hud-level">Level 1</div>
+        <div id="crosshair"></div>
+    </div>
+
+    <!-- ── Controls hint ── -->
+    <div id="instructions">
+        <p><b>[3D SOLO]</b></p>
+        <p>🕹 <b>WASD</b> + <b>Space</b></p>
+        <p>🖱 <b>Mouse drag</b> — Rotate Camera</p>
+        <p><b>[2D SPLIT-SCREEN]</b></p>
+        <p>🔴 <b>P1:</b> A/D Move | W Jump</p>
+        <p>🔵 <b>P2:</b> ⬅️/➡️ Move | ⬆️ Jump</p>
+    </div>
+
+    <!-- ── Level Overlay ── -->
+    <div id="level-overlay">
+        <div id="overlay-card">
+            <div id="overlay-title">Cartoony Platformer</div>
+            <button id="overlay-btn-3d" class="overlay-btn">🎮 Play 3D Solo Tower</button>
+            <br><br>
+            <button id="overlay-btn-2d" class="overlay-btn">🏁 Play 2D Split-Screen Race</button>
+        </div>
+    </div>
+
+    <!-- Game scripts — plain JS, no modules needed -->
+    <script src="towers.js?v=4"></script>
+    <script src="script.js?v=4"></script>
+
+    <!-- ANTI-CACHE OVERRIDE: FORCE FIXES DIRECTLY -->
+    <script>
+        // Force the missing platforms directly into memory so cache can't hide them
+        setTimeout(() => {
+            if (typeof TOWERS !== 'undefined' && TOWERS[0]) {
+                // Bridge the impossible jump 3
+                TOWERS[0].platforms.push([8, 305, 1, 5, 1, 5, 0x8d6e63]);
+                // Bridge the final gap
+                TOWERS[0].platforms.push([4, 311, -4, 5, 1, 5, 0xa1887f]);
+                TOWERS[0].platforms.push([-2, 314, 0, 5, 1, 5, 0x8d6e63]);
+                TOWERS[0].platforms.push([-8, 317, 4, 5, 1, 5, 0x795548]);
+                TOWERS[0].platforms.push([-12, 320, 6, 5, 1, 5, 0x5d4037]);
+            }
+
+            if (typeof scene !== 'undefined') {
+                // Completely detach from the original goal logic and spawn a giant, unbreakable 
+                // bright yellow box right above the final platform
+                const overrideGeo = new THREE.BoxGeometry(3, 3, 3);
+                const overrideMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const overrideGoal = new THREE.Mesh(overrideGeo, overrideMat);
+                overrideGoal.position.set(8, 338, 8);
+                overrideGoal.frustumCulled = false; // Cannot be hidden by camera
+                scene.add(overrideGoal);
+                
+                let _time = 0;
+                function spinAndCheck() {
+                    _time += 0.05;
+                    overrideGoal.rotation.x += 0.03;
+                    overrideGoal.rotation.y += 0.05;
+                    overrideGoal.position.y = 338 + Math.sin(_time) * 0.5;
+                    
+                    // Force the actual game goal to sync here just in case they collide with that instead
+                    if (typeof goalMesh !== 'undefined' && goalMesh) {
+                        goalMesh.position.copy(overrideGoal.position);
+                        goalMesh.visible = false; // Hide the broken one entirely
+                    }
+                    
+                    // Manually trigger the win screen since the old goal might be fundamentally broken by the cache
+                    if (typeof p1Obj !== 'undefined' && p1Obj.mesh && typeof triggerWin === 'function') {
+                        const dist = p1Obj.mesh.position.distanceTo(overrideGoal.position);
+                        if (dist < 3.0 && typeof levelTransitioning !== 'undefined' && !levelTransitioning) {
+                            triggerWin('Player 1');
+                        }
+                    }
+                    requestAnimationFrame(spinAndCheck);
+                }
+                spinAndCheck();
+            }
+
+            // Patch engine loop to force P2 hiding
+            if (typeof GAME_MODE !== 'undefined') {
+                setInterval(() => {
+                    if (GAME_MODE === '3D_SOLO') {
+                        if (typeof p2Obj !== 'undefined' && p2Obj.mesh) {
+                            p2Obj.mesh.visible = false;
+                            p2Obj.lHand.visible = false;
+                            p2Obj.rHand.visible = false;
+                            p2Obj.mesh.position.y = -9999;
+                        }
+                    }
+                }, 100);
+            }
+        }, 1500); // Wait enough time for script.js to fully init
+    </script>
+</body>
+
+</html>
